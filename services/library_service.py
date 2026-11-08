@@ -5,7 +5,7 @@ import sqlite3
 import unicodedata
 from typing import Callable
 
-from database.repositories import AlbumRepository, CancionRepository
+from database.repositories import AlbumRepository, CancionRepository, ConfiguracionRepository, SeleccionRapidaRepository
 from models.entities import Album, Cancion, ResultadoCancion
 from services.chords import clasificar_linea, normalizar_semitonos
 
@@ -20,6 +20,7 @@ ORDEN_POR_DEFECTO = "recientes"
 MAX_NOMBRE_ALBUM = 80
 MAX_TITULO = 120
 MAX_LETRA = 100_000
+MAX_SELECCION_RAPIDA = 15
 
 
 class ValidationError(Exception):
@@ -58,6 +59,8 @@ class ServicioBiblioteca:
         self.con = con
         self.albumes = AlbumRepository(con)
         self.canciones = CancionRepository(con)
+        self.seleccion_rapida = SeleccionRapidaRepository(con)
+        self.configuracion = ConfiguracionRepository(con)
 
     def cerrar(self) -> None:
         self.con.close()
@@ -191,3 +194,79 @@ class ServicioBiblioteca:
     def listar_canciones(self, album_id: int, consulta: str = "", orden: str = ORDEN_POR_DEFECTO):
         self.obtener_album(album_id)
         return self.buscar_canciones(consulta, album_id=album_id, orden=orden)
+
+    # -------------------------------------------------------- selección rápida
+    def listar_seleccion_rapida(self) -> list[ResultadoCancion]:
+        """Devuelve las canciones añadidas a la selección rápida en su orden actual."""
+        filas = self.seleccion_rapida.listar_con_cancion()
+        return [ResultadoCancion(cancion, album_nombre) for cancion, album_nombre in filas]
+
+    def obtener_ids_seleccion_rapida(self) -> list[int]:
+        return self.seleccion_rapida.listar_ids()
+
+    def agregar_a_seleccion_rapida(self, cancion_ids: list[int]) -> list[ResultadoCancion]:
+        """Añade canciones a la selección rápida respetando el límite de 15."""
+        actuales = self.obtener_ids_seleccion_rapida()
+        nuevos = [cid for cid in cancion_ids if cid not in actuales]
+        if not nuevos:
+            return self.listar_seleccion_rapida()
+        if len(actuales) + len(nuevos) > MAX_SELECCION_RAPIDA:
+            disponibles = MAX_SELECCION_RAPIDA - len(actuales)
+            raise ValidationError(
+                f"No se pueden añadir {len(nuevos)} canciones. El límite es de {MAX_SELECCION_RAPIDA} canciones "
+                f"(quedan {disponibles} lugares disponibles)."
+            )
+        for cid in nuevos:
+            self.obtener_cancion(cid)
+        actuales.extend(nuevos)
+        self.seleccion_rapida.guardar_todas(actuales)
+        return self.listar_seleccion_rapida()
+
+    def reemplazar_en_seleccion_rapida(self, posicion: int, nueva_cancion_id: int) -> list[ResultadoCancion]:
+        """Reemplaza la canción en la posición dada por otra."""
+        actuales = self.obtener_ids_seleccion_rapida()
+        if not (0 <= posicion < len(actuales)):
+            raise ValidationError("La posición indicada no existe en la selección rápida.")
+        self.obtener_cancion(nueva_cancion_id)
+        if nueva_cancion_id in actuales and actuales.index(nueva_cancion_id) != posicion:
+            raise ValidationError("Esa canción ya está en la selección rápida.")
+        actuales[posicion] = nueva_cancion_id
+        self.seleccion_rapida.guardar_todas(actuales)
+        return self.listar_seleccion_rapida()
+
+    def eliminar_de_seleccion_rapida(self, posicion: int) -> list[ResultadoCancion]:
+        """Elimina una canción de la selección rápida según su índice."""
+        actuales = self.obtener_ids_seleccion_rapida()
+        if not (0 <= posicion < len(actuales)):
+            raise ValidationError("La posición indicada no existe en la selección rápida.")
+        actuales.pop(posicion)
+        self.seleccion_rapida.guardar_todas(actuales)
+        return self.listar_seleccion_rapida()
+
+    def mover_en_seleccion_rapida(self, origen: int, destino: int) -> list[ResultadoCancion]:
+        """Cambia el orden de una canción de la posición origen a la posición destino."""
+        actuales = self.obtener_ids_seleccion_rapida()
+        n = len(actuales)
+        if not (0 <= origen < n and 0 <= destino < n):
+            raise ValidationError("Posición fuera de rango.")
+        if origen == destino:
+            return self.listar_seleccion_rapida()
+        item = actuales.pop(origen)
+        actuales.insert(destino, item)
+        self.seleccion_rapida.guardar_todas(actuales)
+        return self.listar_seleccion_rapida()
+
+    def vaciar_seleccion_rapida(self) -> None:
+        """Vacía por completo la selección rápida."""
+        self.seleccion_rapida.vaciar()
+
+    # ----------------------------------------------------------- configuración
+    def obtener_tema(self, por_defecto: str = "oscuro") -> str:
+        """Devuelve el nombre del tema guardado ('oscuro', 'claro', 'grises', etc.)."""
+        return self.configuracion.obtener("tema", por_defecto)
+
+    def guardar_tema(self, tema: str) -> None:
+        """Persiste la preferencia de tema en la base de datos."""
+        self.configuracion.guardar("tema", tema)
+
+

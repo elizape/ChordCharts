@@ -30,6 +30,8 @@ Si el venv no ve Tk, creá el entorno con `python3 -m venv --system-site-package
 | **Transposición** | Botones **− / +** (en semitonos) en la pantalla de lectura. La última transposición **se guarda** por canción; la letra original no se modifica y «Original» vuelve a 0. |
 | **Orden** | Más recientes, más antiguos, A→Z, Z→A (álbumes y canciones). |
 | **Búsqueda** | En la pantalla principal busca canciones en **todos** los álbumes; dentro de un álbum, solo en **ese** álbum. Busca en título y letra, sin distinguir mayúsculas ni tildes, e ignora las líneas de acordes. |
+| **Selección rápida** | Columna derecha en la pantalla principal para armar un repertorio de hasta 15 canciones. Permite reordenar arrastrando con el mouse (drag & drop), cambiar por otra canción, eliminar individualmente o vaciar la lista. Selector modal con navegación por álbumes, botón de retroceso y selección múltiple. |
+| **Configuración (⚙) y Temas** | Botón de engranaje para abrir los ajustes de la app. Permite cambiar el tema en tiempo real entre **Oscuro profundo**, **Claro luminoso**, **Grises (Slate)** y **Cálido (Acústico)**, con persistencia automática de la preferencia y adaptación de alto contraste para acordes y letras. |
 
 ## Cómo escribir los acordes
 

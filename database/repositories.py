@@ -108,3 +108,53 @@ class CancionRepository:
     def eliminar(self, cancion_id: int) -> None:
         with self.con:
             self.con.execute("DELETE FROM cancion WHERE id = ?", (cancion_id,))
+
+
+class SeleccionRapidaRepository:
+    def __init__(self, con: sqlite3.Connection) -> None:
+        self.con = con
+
+    def listar_con_cancion(self) -> list[tuple[Cancion, str]]:
+        sql = (
+            "SELECT c.*, a.nombre AS album_nombre, s.posicion "
+            "FROM seleccion_rapida s "
+            "JOIN cancion c ON c.id = s.cancion_id "
+            "JOIN album a ON a.id = c.album_id "
+            "ORDER BY s.posicion ASC"
+        )
+        return [(_a_cancion(f), f["album_nombre"]) for f in self.con.execute(sql).fetchall()]
+
+    def listar_ids(self) -> list[int]:
+        filas = self.con.execute("SELECT cancion_id FROM seleccion_rapida ORDER BY posicion ASC").fetchall()
+        return [int(f["cancion_id"]) for f in filas]
+
+    def guardar_todas(self, cancion_ids: list[int]) -> None:
+        with self.con:
+            self.con.execute("DELETE FROM seleccion_rapida")
+            self.con.executemany(
+                "INSERT INTO seleccion_rapida (posicion, cancion_id) VALUES (?, ?)",
+                [(idx, cid) for idx, cid in enumerate(cancion_ids)],
+            )
+
+    def vaciar(self) -> None:
+        with self.con:
+            self.con.execute("DELETE FROM seleccion_rapida")
+
+
+class ConfiguracionRepository:
+    def __init__(self, con: sqlite3.Connection) -> None:
+        self.con = con
+
+    def obtener(self, clave: str, por_defecto: str = "") -> str:
+        fila = self.con.execute("SELECT valor FROM configuracion WHERE clave = ?", (clave,)).fetchone()
+        return fila["valor"] if fila else por_defecto
+
+    def guardar(self, clave: str, valor: str) -> None:
+        with self.con:
+            self.con.execute(
+                "INSERT INTO configuracion (clave, valor) VALUES (?, ?) "
+                "ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor",
+                (clave, valor),
+            )
+
+

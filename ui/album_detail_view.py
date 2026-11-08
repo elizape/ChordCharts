@@ -23,6 +23,7 @@ class VistaAlbum(ttk.Frame):
         self.titulo.pack(anchor="w")
         self.resumen = ttk.Label(centro, text="", foreground=pal.muted, font=f.ui(11))
         self.resumen.pack(anchor="w", pady=(2, 0))
+        ttk.Button(cab, text="⚙", bootstyle="secondary-outline", width=3, command=app.abrir_configuracion).pack(side="right", padx=(8, 0))
         ttk.Button(cab, text="＋  Nueva canción", bootstyle="primary", command=self.nueva_cancion).pack(side="right")
         ttk.Button(cab, text="Renombrar", bootstyle="secondary-outline", command=self.renombrar).pack(side="right", padx=(0, 10))
 

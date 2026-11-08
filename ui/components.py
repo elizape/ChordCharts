@@ -506,6 +506,7 @@ class Toast:
         self.raiz, self.pal, self.fuentes = raiz, pal, fuentes
         self._label: tk.Label | None = None
         self._job = None
+        raiz.bind("<Destroy>", lambda e: self.cancelar() if e.widget == self.raiz else None, add="+")
 
     def mostrar(self, texto: str, tipo: str = "ok", ms: int = 2400) -> None:
         color = {"ok": self.pal.success, "info": self.pal.primary, "error": self.pal.danger}.get(tipo, self.pal.success)
@@ -515,14 +516,46 @@ class Toast:
                               highlightthickness=1, highlightbackground=color)
         self._label.place(relx=0.5, rely=1.0, y=-26, anchor="s")
         self._label.lift()
+        self.cancelar()
+        try:
+            self._job = self.raiz.after(ms, self._safe_ocultar)
+        except tk.TclError:
+            self._job = None
+
+    def _safe_ocultar(self) -> None:
+        self._job = None
+        try:
+            self.ocultar()
+        except Exception:
+            pass
+
+    def cancelar(self) -> None:
         if self._job is not None:
-            self.raiz.after_cancel(self._job)
-        self._job = self.raiz.after(ms, self.ocultar)
+            try:
+                self.raiz.after_cancel(self._job)
+            except Exception:
+                pass
+            self._job = None
 
     def ocultar(self) -> None:
         self._job = None
         if self._label is not None:
-            self._label.place_forget()
+            try:
+                self._label.place_forget()
+            except tk.TclError:
+                pass
+
+    def actualizar_paleta(self, pal) -> None:
+        self.pal = pal
+        self.cancelar()
+        if self._label is not None:
+            try:
+                self._label.destroy()
+            except Exception:
+                pass
+            self._label = None
+
+
 
 
 class ZonaLista(W.Frame):

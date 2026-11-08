@@ -7,6 +7,7 @@ from services.library_service import ValidationError  # noqa: F401  (re-exportad
 from ui.components import (
     BarraBusqueda, FilaCancion, TarjetaAlbum, ZonaLista, confirmar, crear_combo_orden, pedir_nombre, plural,
 )
+from ui.quick_selection import PanelSeleccionRapida
 
 ANCHO_MIN_TARJETA = 300
 MAX_COLUMNAS = 4
@@ -20,16 +21,31 @@ class VistaAlbumes(ttk.Frame):
         self._tarjetas: list = []
         self._cols = 0
 
-        cab = ttk.Frame(self, padding=(32, 28, 32, 4))
+        # Columna derecha: Selección rápida
+        self.panel_rapido = PanelSeleccionRapida(self, app, ancho=320)
+        self.panel_rapido.pack(side="right", fill="y")
+
+        # Contenedor principal izquierdo: Álbumes y buscador
+        izq_frame = ttk.Frame(self)
+        izq_frame.pack(side="left", fill="both", expand=True)
+
+        cab = ttk.Frame(izq_frame, padding=(32, 28, 32, 4))
         cab.pack(fill="x")
         izq = ttk.Frame(cab)
         izq.pack(side="left")
         ttk.Label(izq, text="Mis álbumes", font=f.ui(24, "bold")).pack(anchor="w")
         self.resumen = ttk.Label(izq, text="", foreground=pal.muted, font=f.ui(11))
         self.resumen.pack(anchor="w", pady=(2, 0))
-        ttk.Button(cab, text="＋  Nuevo álbum", bootstyle="primary", command=self.nuevo_album).pack(side="right")
 
-        barra = ttk.Frame(self, padding=(32, 16, 32, 14))
+        acciones_cab = ttk.Frame(cab)
+        acciones_cab.pack(side="right")
+        ttk.Button(acciones_cab, text="＋  Nuevo álbum", bootstyle="primary", command=self.nuevo_album).pack(side="left", padx=(0, 8))
+        self.btn_config = ttk.Button(
+            acciones_cab, text="⚙", bootstyle="secondary-outline", width=3, command=app.abrir_configuracion
+        )
+        self.btn_config.pack(side="left")
+
+        barra = ttk.Frame(izq_frame, padding=(32, 16, 32, 14))
         barra.pack(fill="x")
         self.busqueda = BarraBusqueda(
             barra, pal, f, "Buscar canciones en todos los álbumes…", self._buscar, inicial=app.busqueda_global
@@ -37,7 +53,7 @@ class VistaAlbumes(ttk.Frame):
         self.busqueda.pack(side="left", fill="x", expand=True)
         crear_combo_orden(barra, app.orden_albumes, self._cambiar_orden).pack(side="right", padx=(14, 0))
 
-        self.zona = ZonaLista(self, pal, f)
+        self.zona = ZonaLista(izq_frame, pal, f)
         self.zona.pack(fill="both", expand=True, padx=24, pady=(0, 16))
         self.zona.scroll.al_cambiar_ancho(self._acomodar)
         self.refrescar()
@@ -58,6 +74,7 @@ class VistaAlbumes(ttk.Frame):
             self._pintar_resultados(consulta)
         else:
             self._pintar_albumes()
+        self.panel_rapido.refrescar()
 
     def _pintar_albumes(self) -> None:
         s, app = self.app.servicio, self.app

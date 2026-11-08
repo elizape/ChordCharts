@@ -24,6 +24,18 @@ CREATE TABLE IF NOT EXISTS cancion (
 );
 
 CREATE INDEX IF NOT EXISTS idx_cancion_album ON cancion(album_id);
+
+CREATE TABLE IF NOT EXISTS seleccion_rapida (
+    posicion   INTEGER NOT NULL UNIQUE,
+    cancion_id INTEGER NOT NULL REFERENCES cancion(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_seleccion_rapida_cancion ON seleccion_rapida(cancion_id);
+
+CREATE TABLE IF NOT EXISTS configuracion (
+    clave TEXT PRIMARY KEY,
+    valor TEXT NOT NULL
+);
 """
 
 

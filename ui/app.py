@@ -12,15 +12,16 @@ from ui.album_list_view import VistaAlbumes
 from ui.components import ScrollFrame, Toast
 from ui.song_form_view import VistaFormulario
 from ui.song_view import VistaCancion
-from ui.theme import Fuentes, construir_paleta
-
-TEMA = "cyborg"
+from ui.settings_view import DialogoConfiguracion
+from ui.theme import Fuentes, TEMAS_DEFINIDOS, construir_paleta, resolver_ttk_theme
 
 
 class App:
     def __init__(self, servicio: ServicioBiblioteca) -> None:
         self.servicio = servicio
-        self.root = ttk.Window(title="Mis canciones", themename=TEMA, size=(1180, 760), minsize=(800, 560))
+        self.tema_actual = self.servicio.obtener_tema(por_defecto="oscuro")
+        tema_ttk = resolver_ttk_theme(self.tema_actual)
+        self.root = ttk.Window(title="Mis canciones", themename=tema_ttk, size=(1180, 760), minsize=(800, 560))
         self.pal = construir_paleta(ttk.Style().colors)
         self.fuentes = Fuentes(self.root)
         self.toast = Toast(self.root, self.pal, self.fuentes)
@@ -72,9 +73,18 @@ class App:
             self.toast.mostrar(str(e), "error")
             self.mostrar_albumes()
 
-    def mostrar_cancion(self, cancion_id: int, volver: Callable[[], None]) -> None:
+    def mostrar_cancion(
+        self,
+        cancion_id: int,
+        volver: Callable[[], None],
+        desde_seleccion_rapida: bool = False,
+    ) -> None:
         try:
-            self._cambiar_vista(lambda p: VistaCancion(p, self, cancion_id, volver))
+            self._cambiar_vista(
+                lambda p: VistaCancion(
+                    p, self, cancion_id, volver, desde_seleccion_rapida=desde_seleccion_rapida
+                )
+            )
         except NotFoundError as e:
             self.toast.mostrar(str(e), "error")
             volver()
@@ -89,11 +99,51 @@ class App:
             return
         self._cambiar_vista(lambda p: VistaFormulario(p, self, album, cancion, volver))
 
+    def abrir_configuracion(self) -> None:
+        """Abre el diálogo modal de configuración de la app."""
+        DialogoConfiguracion(self.root, self).mostrar()
+
+    def aplicar_tema(self, tema_id: str) -> None:
+        """Cambia el tema dinámicamente y refresca la interfaz completa."""
+        if tema_id not in TEMAS_DEFINIDOS:
+            return
+        self.tema_actual = tema_id
+        self.servicio.guardar_tema(tema_id)
+
+        temas_ttk = getattr(self.root.style, "theme_names", lambda: [])()
+        ttk_nombre = resolver_ttk_theme(tema_id, temas_ttk)
+
+        try:
+            self.root.style.theme_use(ttk_nombre)
+        except Exception:
+            pass
+
+        self.pal = construir_paleta(self.root.style.colors)
+        self.toast.actualizar_paleta(self.pal)
+
+        # Refrescar la vista actual para reconstruir los widgets con la nueva paleta
+        if isinstance(self.vista, VistaAlbumes):
+            self.mostrar_albumes()
+        elif isinstance(self.vista, VistaAlbum):
+            aid = self.vista.album_id
+            self.mostrar_album(aid)
+        elif isinstance(self.vista, VistaCancion):
+            cid = self.vista.cancion.id
+            volver = self.vista.volver
+            dsr = getattr(self.vista, "desde_seleccion_rapida", False)
+            self.mostrar_cancion(cid, volver, desde_seleccion_rapida=dsr)
+        elif self.vista is not None:
+            self.mostrar_albumes()
+
+        info = TEMAS_DEFINIDOS[tema_id]
+        self.toast.mostrar(f"Tema activado: {info['nombre']}", "ok")
+
     # ------------------------------------------------------------------ ciclo
     def salir(self) -> None:
         confirmar = getattr(self.vista, "confirmar_salida", None)
         if confirmar is not None and not confirmar():
             return
+        self.toast.cancelar()
         self.servicio.cerrar()
         self.root.destroy()
 

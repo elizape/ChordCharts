@@ -178,6 +178,63 @@ class ServicioTest(unittest.TestCase):
         self._escenario_busqueda()
         self.assertEqual(len(self.svc.buscar_canciones("")), 3)
 
+    # -------------------------------------------------------- selección rápida
+    def test_seleccion_rapida_flujo_completo(self):
+        a = self.svc.crear_album("Álbum A")
+        c1 = self.svc.crear_cancion(a.id, "Canción 1", "Letra 1")
+        c2 = self.svc.crear_cancion(a.id, "Canción 2", "Letra 2")
+        c3 = self.svc.crear_cancion(a.id, "Canción 3", "Letra 3")
+
+        # Inicialmente vacía
+        self.assertEqual(self.svc.listar_seleccion_rapida(), [])
+
+        # Agregar canciones (múltiples)
+        res = self.svc.agregar_a_seleccion_rapida([c1.id, c2.id])
+        self.assertEqual([r.cancion.id for r in res], [c1.id, c2.id])
+        self.assertEqual(res[0].album_nombre, "Álbum A")
+
+        # Reordenar (mover de 1 a 0)
+        res = self.svc.mover_en_seleccion_rapida(1, 0)
+        self.assertEqual([r.cancion.id for r in res], [c2.id, c1.id])
+
+        # Reemplazar canción en pos 1 por c3
+        res = self.svc.reemplazar_en_seleccion_rapida(1, c3.id)
+        self.assertEqual([r.cancion.id for r in res], [c2.id, c3.id])
+
+        # Eliminar una
+        res = self.svc.eliminar_de_seleccion_rapida(0)
+        self.assertEqual([r.cancion.id for r in res], [c3.id])
+
+        # Vaciar lista
+        self.svc.vaciar_seleccion_rapida()
+        self.assertEqual(self.svc.listar_seleccion_rapida(), [])
+
+    def test_seleccion_rapida_limite_15_canciones(self):
+        a = self.svc.crear_album("Álbum Límite")
+        canciones = [self.svc.crear_cancion(a.id, f"Tema {i}", f"Letra {i}") for i in range(16)]
+
+        # Añadir 15 canciones permitidas
+        self.svc.agregar_a_seleccion_rapida([c.id for c in canciones[:15]])
+        self.assertEqual(len(self.svc.listar_seleccion_rapida()), 15)
+
+        # Intentar añadir una más debe fallar
+        with self.assertRaises(ValidationError):
+            self.svc.agregar_a_seleccion_rapida([canciones[15].id])
+
+    def test_seleccion_rapida_cascada_al_eliminar_cancion(self):
+        a = self.svc.crear_album("Álbum Cascada")
+        c1 = self.svc.crear_cancion(a.id, "Tema A", "")
+        c2 = self.svc.crear_cancion(a.id, "Tema B", "")
+        self.svc.agregar_a_seleccion_rapida([c1.id, c2.id])
+        self.assertEqual(len(self.svc.listar_seleccion_rapida()), 2)
+
+        # Al eliminar c1 de la base de datos, se elimina de selección rápida
+        self.svc.eliminar_cancion(c1.id)
+        restantes = self.svc.listar_seleccion_rapida()
+        self.assertEqual(len(restantes), 1)
+        self.assertEqual(restantes[0].cancion.id, c2.id)
+
+
 
 if __name__ == "__main__":
     unittest.main()
